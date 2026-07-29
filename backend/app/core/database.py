@@ -13,33 +13,34 @@ settings = get_settings()
 
 def _make_engine(database_url: str):
     """
-    Build the SQLAlchemy engine with psycopg2-binary.
+    Build the SQLAlchemy engine for psycopg3 (psycopg[binary]).
+    Works on any Python version including 3.14 — pure binary wheels available.
 
-    Neon provides URLs like:
+    Neon URL format:
         postgresql://user:pass@host/db?sslmode=require&channel_binding=require
 
-    psycopg2 needs:
-        - scheme: postgresql:// (already correct — do NOT add +psycopg2 suffix
-          because psycopg2-binary registers itself as the default dialect)
-        - sslmode kept in the URL query string (psycopg2 reads it there)
-        - channel_binding stripped (psycopg2 doesn't support it)
+    psycopg3 needs:
+        - scheme: postgresql+psycopg://
+        - sslmode in connect_args (not query string)
+        - channel_binding stripped
     """
     url = database_url
 
-    # Normalise postgres:// → postgresql:// (Heroku/Neon shorthand)
+    # Normalise scheme for psycopg3
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://") and "+psycopg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # Strip psycopg3-specific params psycopg2 doesn't understand.
-    url = re.sub(r"[?&]channel_binding=[^&]*", "", url).rstrip("?&")
+    # Strip params psycopg3 doesn't accept in the URL query string
+    url = re.sub(r"[?&](sslmode|channel_binding)=[^&]*", "", url).rstrip("?&")
 
-    # Neon requires SSL — pass via connect_args for reliability
     is_neon = "neon" in database_url
     connect_args = {"sslmode": "require"} if is_neon else {}
 
     return create_engine(
         url,
-        pool_pre_ping=True,   # catches stale connections → handles Neon idle suspend
+        pool_pre_ping=True,
         pool_size=3,
         max_overflow=2,
         pool_recycle=300,
@@ -56,10 +57,7 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    """
-    FastAPI dependency — yields a DB session with retry/back-off for
-    Neon's brief reconnect delay after compute suspension.
-    """
+    """FastAPI dependency — yields a DB session with retry for Neon idle reconnects."""
     db = None
     retries = 3
     for attempt in range(retries):
@@ -77,8 +75,7 @@ def get_db():
             if attempt < retries - 1:
                 logger.warning(
                     "DB connection attempt %d failed (Neon may be waking): %s",
-                    attempt + 1,
-                    exc,
+                    attempt + 1, exc,
                 )
                 time.sleep(2 ** attempt)
             else:
