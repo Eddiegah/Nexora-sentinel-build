@@ -14,20 +14,85 @@
 3. On the dashboard click **"Connect"** (top right)
    - Toggle "Connection pooling" → OFF
    - Copy the full connection string (starts with `postgresql://`)
-   - **Paste it here so you don't lose it:** `DATABASE_URL=___________________`
+   - **Paste it here so you don't lose it:** `DATABASE_URL= postgresql://neondb_owner:npg_LzPA9KoeUuX5@ep-restless-math-axrtp6t5.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require__________________`
 
 4. Click **"SQL Editor"** in the left sidebar
-5. Paste this entire block and click Run:
+5. Clear the editor completely, paste the block below, click Run:
 
---- PASTE INTO NEON SQL EDITOR ---
-(Contents of backend/migrations/001_initial_schema.sql — copy from the file)
---- END ---
+```sql
+BEGIN;
 
-6. Clear the editor, paste this block and click Run:
+CREATE TABLE IF NOT EXISTS regions (
+    id         SERIAL PRIMARY KEY,
+    name       TEXT NOT NULL,
+    country    TEXT NOT NULL,
+    latitude   DOUBLE PRECISION NOT NULL,
+    longitude  DOUBLE PRECISION NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
---- PASTE INTO NEON SQL EDITOR ---
-(Contents of backend/migrations/002_seed_admin_user.sql — copy from the file)
---- END ---
+CREATE TABLE IF NOT EXISTS region_indicators (
+    id                 SERIAL PRIMARY KEY,
+    region_id          INTEGER REFERENCES regions(id) ON DELETE CASCADE,
+    date               DATE NOT NULL,
+    rainfall_mm        DOUBLE PRECISION,
+    avg_temp_c         DOUBLE PRECISION,
+    humidity_pct       DOUBLE PRECISION,
+    population_density DOUBLE PRECISION,
+    historical_cases   INTEGER,
+    source             TEXT NOT NULL,
+    CONSTRAINT uq_indicator_region_date_source UNIQUE (region_id, date, source)
+);
+
+CREATE TABLE IF NOT EXISTS predictions (
+    id               SERIAL PRIMARY KEY,
+    region_id        INTEGER REFERENCES regions(id) ON DELETE CASCADE,
+    predicted_at     TIMESTAMPTZ DEFAULT now(),
+    risk_score       DOUBLE PRECISION NOT NULL,
+    risk_category    TEXT NOT NULL,
+    model_version    TEXT NOT NULL,
+    shap_explanation JSONB NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id            SERIAL PRIMARY KEY,
+    email         TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'health_worker',
+    created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO regions (name, country, latitude, longitude) VALUES
+    ('Kampala',         'Uganda',       0.3476,   32.5825),
+    ('Nairobi',         'Kenya',       -1.2921,   36.8219),
+    ('Dar es Salaam',   'Tanzania',    -6.7924,   39.2083),
+    ('Accra',           'Ghana',        5.6037,   -0.1870),
+    ('Lagos',           'Nigeria',      6.5244,    3.3792),
+    ('Kinshasa',        'DRC',         -4.4419,   15.2663),
+    ('Lusaka',          'Zambia',     -15.4167,   28.2833),
+    ('Lilongwe',        'Malawi',     -13.9626,   33.7741),
+    ('Maputo',          'Mozambique', -25.9692,   32.5732),
+    ('Antananarivo',    'Madagascar', -18.9137,   47.5361)
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+```
+
+6. Clear the editor again, paste the block below, click Run:
+
+```sql
+BEGIN;
+
+INSERT INTO users (email, password_hash, role)
+VALUES (
+    'admin@nexora-sentinel.local',
+    '$2b$12$rjhnOyxBAHdaiqUL/UbcTe5zL9UzZ3WAbW7d6bLfFA8sPfnrCeV8u',
+    'admin'
+)
+ON CONFLICT (email) DO NOTHING;
+
+COMMIT;
+```
 
 ✓ Database is ready. Admin login: admin@nexora-sentinel.local / Sentinel2024!
 
