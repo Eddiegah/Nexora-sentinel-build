@@ -1,0 +1,35 @@
+name: Weekly Postgres Backup
+
+# Runs every Sunday at 03:00 UTC.
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pg_dump client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PGPASSWORD: ""   # psql reads from DATABASE_URL
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          pg_dump "$DATABASE_URL" --no-password -F c -f "backup_${TIMESTAMP}.dump"
+          echo "Backup written: backup_${TIMESTAMP}.dump"
+          ls -lh backup_*.dump
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup_*.dump
+          retention-days: 30

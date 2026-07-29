@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.env
+*.env
+
+# ML artifacts (commit model.json + explainer.pkl, but not raw data)
+ml/artifacts/training_data.csv
+ml/artifacts/backup_*.dump
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/.env.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Postgres backups (uploaded as GitHub Actions artifacts instead)
+backup_*.dump
