@@ -36,7 +36,19 @@ class MLArtifacts:
         self.loaded: bool = False
 
     def load(self, artifact_dir: str) -> None:
+        # Resolve path: if relative, try from CWD first, then from this file's
+        # repo root (handles both local dev and Render's rootDir: backend layout).
         path = Path(artifact_dir)
+        if not path.is_absolute() and not (path / "model.json").exists():
+            # Try resolving relative to the repo root (two levels up from backend/app/core/)
+            repo_root = Path(__file__).parent.parent.parent.parent
+            alt_path = repo_root / artifact_dir
+            if (alt_path / "model.json").exists():
+                path = alt_path
+            else:
+                # Last resort: resolve relative to CWD
+                path = Path.cwd() / artifact_dir
+
         model_path = path / "model.json"
         explainer_path = path / "explainer.pkl"
         metrics_path = path / "metrics.json"
