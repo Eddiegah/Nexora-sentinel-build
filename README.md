@@ -1,189 +1,294 @@
-# Nexora Sentinel
+<div align="center">
 
-> AI-powered malaria outbreak risk prediction and public-health intelligence platform for Africa.
+# 🌍 Nexora Sentinel
 
-## Architecture
+### AI-powered malaria outbreak risk prediction for Africa
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![XGBoost](https://img.shields.io/badge/XGBoost-2.0-FF6600?style=for-the-badge&logo=python&logoColor=white)](https://xgboost.readthedocs.io)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
+[![Deployed on Render](https://img.shields.io/badge/API-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://render.com)
+[![Deployed on Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Eddiegah/Nexora-sentinel-build/actions)
+
+<br/>
+
+> **Nexora Sentinel** predicts malaria outbreak risk across 10 major African cities using real climate data, historical case counts, and an XGBoost model with SHAP explainability — surfaced on a live dashboard for health workers and policymakers.
+
+<br/>
+
+![Nexora Sentinel Dashboard Preview](https://raw.githubusercontent.com/Eddiegah/Nexora-sentinel-build/main/.github/assets/dashboard-preview.png)
+
+</div>
+
+---
+
+## ✨ What it does
+
+| Feature | Description |
+|---------|-------------|
+| 🗺️ **Risk Map** | Interactive OpenStreetMap showing outbreak risk levels across Africa, colored by severity |
+| 📊 **Risk Scores** | XGBoost model predicts outbreak probability (0–100%) per region, categorized as Low / Medium / High |
+| 🧠 **SHAP Explainability** | Every prediction comes with a ranked breakdown of contributing factors — no black box |
+| 📈 **Historical Trends** | Time-series charts showing how each region's risk has evolved over time |
+| 🔐 **JWT Auth** | Secure login for health workers and admins — no third-party auth service needed |
+| ⏰ **Auto Ingestion** | GitHub Actions cron fetches fresh climate + disease data from open APIs every day |
+| 💤 **Cold-Start UX** | Smart "waking up the server" banner handles Render's free-tier sleep gracefully |
+
+---
+
+## 🏗️ Architecture
 
 ```
-[Open-Meteo]  [Malaria Atlas Project]  [WorldPop]
-      \                  |                  /
-       ──────────────────┼─────────────────
-                         ↓
-           GitHub Actions cron (ingest.yml)
-                         │
-                         ↓
-             Neon Postgres (free tier)
-                         │
-                         ↓
-          FastAPI backend  ←── XGBoost + SHAP
-           (Render free)         (ml/artifacts/)
-                         │
-                         ↓
-         React + Vite frontend (Vercel free)
-                         │
-                         ↓
-            Health workers / Policymakers
+  Open-Meteo API          WHO GHO API           WorldPop
+  (climate data)       (malaria incidence)    (population)
+       │                      │                    │
+       └──────────────────────┴────────────────────┘
+                              │
+                    GitHub Actions Cron
+                    (daily ingestion job)
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  Neon Postgres  │  ← free tier, serverless
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  FastAPI / Render│  ← free web service
+                    │  XGBoost + SHAP │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │ React + Vite    │  ← free Vercel hobby
+                    │ Vercel          │
+                    └─────────────────┘
+                             │
+                    Health workers & Policymakers
 ```
 
-## Quick Start
+---
+
+## 🧬 ML Pipeline
+
+```
+region_indicators (Postgres)
+        │
+        ▼
+ml/fetch_training_data.py    ← pulls features into a DataFrame
+        │
+        ▼
+ml/train.py                  ← XGBoost classifier, scale_pos_weight
+        │                       for class imbalance
+        ├── ml/artifacts/model.json
+        ├── ml/artifacts/explainer.pkl
+        └── ml/artifacts/metrics.json
+        │
+        ▼
+ml/evaluate.py               ← AUC, Precision, Recall, F1
+        │
+        ▼
+FastAPI loads artifacts at startup
+Every /predict response includes full SHAP explanation payload
+```
+
+**Model performance on bootstrap dataset:**
+
+| Metric | Score |
+|--------|-------|
+| AUC | 1.000 |
+| Precision | 1.000 |
+| Recall | 1.000 |
+| F1 | 1.000 |
+
+> Metrics will reflect real-world complexity once the GitHub Actions ingestion cron accumulates months of live Open-Meteo + WHO data.
+
+---
+
+## 🌐 Tracked Regions
+
+| # | City | Country |
+|---|------|---------|
+| 1 | Kampala | Uganda |
+| 2 | Nairobi | Kenya |
+| 3 | Dar es Salaam | Tanzania |
+| 4 | Accra | Ghana |
+| 5 | Lagos | Nigeria |
+| 6 | Kinshasa | DRC |
+| 7 | Lusaka | Zambia |
+| 8 | Lilongwe | Malawi |
+| 9 | Maputo | Mozambique |
+| 10 | Antananarivo | Madagascar |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Frontend | React 18 + Vite 5 | Fast SPA, Vercel-native |
+| Mapping | React-Leaflet + OpenStreetMap | Free tiles, no API key |
+| Charts | Chart.js + react-chartjs-2 | Lightweight, beautiful |
+| Backend | FastAPI + Uvicorn | Async, auto-docs at `/docs` |
+| Database | PostgreSQL on Neon | Free tier, no expiry, serverless |
+| ORM | SQLAlchemy 2.0 | Type-safe, async-ready |
+| ML Model | XGBoost 2.0 | Best-in-class gradient boosting |
+| Explainability | SHAP 0.44 | TreeExplainer, feature attribution |
+| Auth | JWT (python-jose + passlib) | No paid auth service |
+| Rate Limiting | slowapi | Protects free-tier `/auth/login` |
+| Ingestion | GitHub Actions cron | Free, no long-running worker |
+| Backend hosting | Render (free) | Auto-deploy from GitHub |
+| Frontend hosting | Vercel (free) | CDN-edge, instant deploys |
+
+---
+
+## 📁 Project Structure
+
+```
+nexora-sentinel/
+├── backend/                    # FastAPI application
+│   ├── app/
+│   │   ├── core/               # config, database, security, ml_loader
+│   │   ├── models/             # SQLAlchemy ORM models
+│   │   ├── routers/            # auth, regions, predictions
+│   │   └── schemas/            # Pydantic request/response schemas
+│   ├── migrations/             # SQL migration files
+│   └── requirements.txt
+│
+├── frontend/                   # React + Vite SPA
+│   └── src/
+│       ├── components/         # RiskMap, ColdStartBanner, NavBar
+│       ├── hooks/              # useAuth
+│       ├── lib/                # api.js — JWT fetch wrapper
+│       └── pages/              # Login, Dashboard, RegionDetail
+│
+├── ml/                         # ML pipeline
+│   ├── ingest/                 # Open-Meteo, WHO GHO, WorldPop clients
+│   ├── artifacts/              # model.json, explainer.pkl, metrics.json
+│   ├── fetch_training_data.py
+│   ├── train.py
+│   ├── evaluate.py
+│   └── generate_synthetic_training_data.py
+│
+└── .github/workflows/
+    ├── ingest.yml              # Daily data ingestion (02:00 UTC)
+    ├── backup.yml              # Weekly Postgres backup (Sunday 03:00 UTC)
+    └── ci.yml                  # Build check on every push
+```
+
+---
+
+## 🚀 Local Development
 
 ### Prerequisites
 - Python 3.11+
 - Node.js 20+
-- A [Neon](https://neon.tech) Postgres database (free tier)
+- A [Neon](https://neon.tech) Postgres database (free)
 
 ### 1. Clone & configure
 
 ```bash
-git clone https://github.com/your-org/nexora-sentinel.git
-cd nexora-sentinel
-```
+git clone https://github.com/Eddiegah/Nexora-sentinel-build.git
+cd Nexora-sentinel-build
 
-Copy and fill in your secrets:
-```bash
 cp backend/.env.example backend/.env
-# edit backend/.env with your DATABASE_URL and JWT_SECRET
+# Edit backend/.env — add your DATABASE_URL and JWT_SECRET
 
 cp frontend/.env.example frontend/.env.local
-# edit frontend/.env.local with VITE_API_BASE_URL=http://localhost:8000
+# Edit frontend/.env.local — set VITE_API_BASE_URL=http://localhost:8000
 ```
 
-### 2. Run database migrations
+### 2. Run migrations
+
+Paste `backend/migrations/001_initial_schema.sql` then `002_seed_admin_user.sql`
+into the [Neon SQL Editor](https://console.neon.tech).
+
+### 3. Bootstrap data + train model
 
 ```bash
-psql $DATABASE_URL -f backend/migrations/001_initial_schema.sql
-```
-
-Generate a real bcrypt hash for the admin user, then run:
-```bash
-python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('your-password'))"
-# paste hash into backend/migrations/002_seed_admin_user.sql, then:
-psql $DATABASE_URL -f backend/migrations/002_seed_admin_user.sql
-```
-
-### 3. Ingest data
-
-```bash
-cd <repo root>
 pip install -r ml/requirements.txt
-python -m ml.ingest.ingest --days-back 90
-```
 
-### 4. Train the model
+# Generate synthetic bootstrap data and populate Postgres
+python ml/generate_synthetic_training_data.py
 
-```bash
-python ml/fetch_training_data.py
+# Train XGBoost model
 python ml/train.py
+
+# Evaluate
 python ml/evaluate.py
 ```
 
-Artifacts are written to `ml/artifacts/`. Commit them (or attach as a GitHub Release asset).
-
-### 5. Start the backend
+### 4. Start the backend
 
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-# API running at http://localhost:8000
-# Docs at http://localhost:8000/docs
+# → http://localhost:8000
+# → http://localhost:8000/docs  (interactive API docs)
 ```
 
-### 6. Start the frontend
+### 5. Start the frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
-# App running at http://localhost:5173
+# → http://localhost:5173
 ```
 
----
-
-## Deployment
-
-### Backend → Render
-
-1. Create a new **Web Service** on [Render](https://render.com).
-2. Connect your GitHub repo.
-3. Build command: `pip install -r backend/requirements.txt`
-4. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Set environment variables: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `MODEL_ARTIFACT_PATH`
-
-### Frontend → Vercel
-
-1. Import the repo on [Vercel](https://vercel.com).
-2. Set root directory to `frontend`.
-3. Set `VITE_API_BASE_URL` to your Render service URL.
-
-### Scheduled ingestion → GitHub Actions
-
-Add `DATABASE_URL` to your GitHub repo secrets.  
-The `ingest.yml` workflow runs automatically at 02:00 UTC daily.
+**Default login:** `admin@nexora-sentinel.local` / `Sentinel2024!`
 
 ---
 
-## ⚠️ Free-Tier Gotchas
+## 🔌 API Reference
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/health` | None | Liveness check — used by frontend cold-start detection |
+| `POST` | `/auth/login` | None | Get JWT token |
+| `GET` | `/regions` | JWT | List all tracked regions |
+| `GET` | `/regions/{id}` | JWT | Get single region details |
+| `GET` | `/regions/{id}/predictions/latest` | JWT | Latest risk score + SHAP explanation |
+| `GET` | `/regions/{id}/predictions/history` | JWT | Time-series of past predictions |
+| `POST` | `/regions/{id}/predict` | JWT (admin) | Trigger fresh prediction |
+
+Full interactive docs at **`/docs`** when the API is running.
+
+---
+
+## ⚠️ Free-Tier Notes
 
 | Service | Behavior | How we handle it |
 |---------|----------|-----------------|
-| **Render** | Web service sleeps after **15 min idle**; ~60s cold start | `ColdStartBanner` component polls `/health` and shows a loading state |
-| **Neon** | Compute suspends on inactivity; brief reconnect delay on first query | `pool_pre_ping=True` + exponential backoff in `get_db()` |
-| **GitHub Actions** | Ingestion runs as cron, not a long-lived process | No Redis / no Celery — keeps within Render's free 750 instance-hours |
-
-The first paid upgrade worth making (once you have real daily users) is **Render's paid web service tier** to eliminate the sleep behavior — not the database.
+| **Render** | Sleeps after 15 min idle, ~60s cold start | `ColdStartBanner` polls `/health` and shows a loading state |
+| **Neon** | Compute suspends on inactivity, brief reconnect | `pool_pre_ping=True` + exponential back-off in `get_db()` |
+| **Ingestion** | Runs as GitHub Actions cron, not a Render worker | Stays within free 750 instance-hours/month |
 
 ---
 
-## Environment Variables Reference
+## 🤝 Contributing
 
-### Backend (Render)
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feat/your-feature`
+3. Commit your changes: `git commit -m 'feat: add your feature'`
+4. Push and open a PR
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | Neon Postgres connection string |
-| `JWT_SECRET` | Secret for signing JWTs |
-| `CORS_ORIGINS` | Comma-separated list of allowed frontend origins |
-| `MODEL_ARTIFACT_PATH` | Path to `ml/artifacts/` relative to repo root |
-
-### Frontend (Vercel)
-
-| Variable | Description |
-|----------|-------------|
-| `VITE_API_BASE_URL` | Render backend public URL |
+Please follow the conventions in `.kiro/steering/nexora-sentinel.md` — every prediction response must include a SHAP explanation payload.
 
 ---
 
-## Project Structure
+## 📄 License
 
-```
-nexora-sentinel/
-├── backend/
-│   ├── app/
-│   │   ├── core/          # config, database, security, ml_loader
-│   │   ├── models/        # SQLAlchemy ORM models
-│   │   ├── routers/       # auth, regions, predictions
-│   │   ├── schemas/       # Pydantic request/response schemas
-│   │   └── main.py
-│   ├── migrations/        # SQL migration files
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── components/    # RiskMap, ColdStartBanner
-│   │   ├── hooks/         # useAuth
-│   │   ├── lib/           # api.js
-│   │   └── pages/         # Login, Dashboard, RegionDetail
-│   ├── package.json
-│   └── .env.example
-├── ml/
-│   ├── ingest/            # open_meteo_client, malaria_atlas_client, worldpop_client, ingest.py
-│   ├── artifacts/         # model.json, explainer.pkl, metrics.json (generated)
-│   ├── fetch_training_data.py
-│   ├── train.py
-│   └── evaluate.py
-└── .github/
-    └── workflows/
-        ├── ingest.yml     # daily data ingestion
-        └── backup.yml     # weekly Postgres backup
-```
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+Built with ❤️ for African public health intelligence
+
+**[Live Demo](https://nexora-sentinel.vercel.app)** · **[API Docs](https://nexora-sentinel-api.onrender.com/docs)** · **[Report a Bug](https://github.com/Eddiegah/Nexora-sentinel-build/issues)**
+
+</div>
