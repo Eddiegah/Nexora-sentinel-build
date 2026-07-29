@@ -30,10 +30,9 @@ def _make_engine(database_url: str):
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # Strip ?sslmode=... from URL (psycopg3 ignores it in the query string
-    # but honours it in connect_args).
-    import re
-    url_clean = re.sub(r"[?&]sslmode=[^&]*", "", url).rstrip("?")
+    # Strip SSL/auth params from URL query string that psycopg3 handles via connect_args.
+    # This covers sslmode, channel_binding, and any other Neon-appended params.
+    url_clean = re.sub(r"[?&](sslmode|channel_binding)=[^&]*", "", url).rstrip("?")
 
     is_neon = "neon" in database_url
     connect_args = {"sslmode": "require"} if is_neon else {}

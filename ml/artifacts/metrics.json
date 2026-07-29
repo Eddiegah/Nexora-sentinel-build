@@ -1,0 +1,21 @@
+{
+  "model_version": "v20260729-1643",
+  "trained_at": "2026-07-29T16:43:27.474149+00:00",
+  "auc": 1.0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "confusion_matrix": [
+    [
+      1095,
+      0
+    ],
+    [
+      0,
+      365
+    ]
+  ],
+  "test_size_fraction": 0.2,
+  "test_n_samples": 1460,
+  "test_n_positive": 365
+}
