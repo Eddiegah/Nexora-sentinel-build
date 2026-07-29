@@ -1,3 +1,4 @@
+import re
 import time
 import logging
 from sqlalchemy import create_engine
@@ -12,37 +13,36 @@ settings = get_settings()
 
 def _make_engine(database_url: str):
     """
-    Build the SQLAlchemy engine, normalising the DATABASE_URL scheme so
-    it works with both psycopg2 (legacy) and psycopg3 (psycopg[binary]).
+    Build the SQLAlchemy engine with psycopg2-binary.
 
-    Neon provides URLs in the form:
-        postgresql://user:pass@host/db?sslmode=require
-    psycopg3 needs the driver token in the scheme:
-        postgresql+psycopg://user:pass@host/db
-    We also move sslmode out of the query string into connect_args so that
-    psycopg3 receives it in the correct format.
+    Neon provides URLs like:
+        postgresql://user:pass@host/db?sslmode=require&channel_binding=require
+
+    psycopg2 needs:
+        - scheme: postgresql:// (already correct — do NOT add +psycopg2 suffix
+          because psycopg2-binary registers itself as the default dialect)
+        - sslmode kept in the URL query string (psycopg2 reads it there)
+        - channel_binding stripped (psycopg2 doesn't support it)
     """
     url = database_url
 
-    # Normalise scheme for psycopg3.
+    # Normalise postgres:// → postgresql:// (Heroku/Neon shorthand)
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+psycopg://", 1)
-    elif url.startswith("postgresql://") and "+psycopg" not in url:
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        url = url.replace("postgres://", "postgresql://", 1)
 
-    # Strip SSL/auth params from URL query string that psycopg3 handles via connect_args.
-    # This covers sslmode, channel_binding, and any other Neon-appended params.
-    url_clean = re.sub(r"[?&](sslmode|channel_binding)=[^&]*", "", url).rstrip("?")
+    # Strip psycopg3-specific params psycopg2 doesn't understand.
+    url = re.sub(r"[?&]channel_binding=[^&]*", "", url).rstrip("?&")
 
+    # Neon requires SSL — pass via connect_args for reliability
     is_neon = "neon" in database_url
     connect_args = {"sslmode": "require"} if is_neon else {}
 
     return create_engine(
-        url_clean,
-        pool_pre_ping=True,   # rechecks connection health before use → handles Neon idle suspend
+        url,
+        pool_pre_ping=True,   # catches stale connections → handles Neon idle suspend
         pool_size=3,
         max_overflow=2,
-        pool_recycle=300,     # recycle connections every 5 min to avoid stale connections
+        pool_recycle=300,
         connect_args=connect_args,
     )
 
@@ -57,9 +57,8 @@ class Base(DeclarativeBase):
 
 def get_db():
     """
-    FastAPI dependency that yields a DB session.
-    Retries up to 3 times with exponential back-off so the first request
-    after Neon's compute wakes up does not immediately return a 500.
+    FastAPI dependency — yields a DB session with retry/back-off for
+    Neon's brief reconnect delay after compute suspension.
     """
     db = None
     retries = 3
@@ -77,11 +76,11 @@ def get_db():
                 db = None
             if attempt < retries - 1:
                 logger.warning(
-                    "DB connection attempt %d failed (Neon may be waking up): %s",
+                    "DB connection attempt %d failed (Neon may be waking): %s",
                     attempt + 1,
                     exc,
                 )
-                time.sleep(2 ** attempt)  # 1s → 2s → give up
+                time.sleep(2 ** attempt)
             else:
                 raise
     if db is not None:

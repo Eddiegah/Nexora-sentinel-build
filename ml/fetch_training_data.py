@@ -38,11 +38,9 @@ FEATURE_COLUMNS = [
 def fetch(database_url: str, outbreak_percentile: float = 75.0) -> pd.DataFrame:
     url = database_url
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+psycopg://", 1)
-    elif url.startswith("postgresql://") and "+psycopg" not in url:
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        url = url.replace("postgres://", "postgresql://", 1)
     import re
-    url = re.sub(r"[?&](sslmode|channel_binding)=[^&]*", "", url).rstrip("?")
+    url = re.sub(r"[?&]channel_binding=[^&]*", "", url).rstrip("?&")
     is_neon = "neon" in database_url
     connect_args = {"sslmode": "require"} if is_neon else {}
     engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
